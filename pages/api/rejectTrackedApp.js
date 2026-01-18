@@ -6,52 +6,58 @@ import transcript from "../../utils/transcript";
 import { checkEmail, sendVerification, sendEmail } from "../../utils/email";
 
 export default async (req, res) => {
-  const { recordID, teacher, email } = req.body
+  const { recordID, teacher, email } = req.body;
 
   try {
-    ensureMethod({ req, method: 'POST' })
+    ensureMethod({ req, method: 'POST' });
 
-    const emailVerified = await checkEmail({ address: email.from })
-    if (!emailVerified) {
-      await sendVerification({ address: email.from })
-      res.send({ ok: false, err: 'verify email', email: email.from})
-      return
+    // Validate email object structure
+    if (!email || !email.from) {
+      res.status(400).send({ ok: false, err: 'Invalid email object' });
+      return;
     }
 
-    const trackedApp = await airtable.find('Application Tracker', recordID)
+    const emailVerified = await checkEmail({ address: email.from });
+    if (!emailVerified) {
+      await sendVerification({ address: email.from });
+      res.send({ ok: false, err: 'verify email', email: email.from });
+      return;
+    }
+
+    const trackedApp = await airtable.find('Application Tracker', recordID);
 
     const currentEntryNote = trackedApp.fields["Notes"];
 
     const note = currentEntryNote
       ? `${currentEntryNote}\nUpdated with webhook: ${teacher ? "teacher" : "reject"}`
-      : `Updated with webhook: ${teacher ? "teacher" : "reject"}`
+      : `Updated with webhook: ${teacher ? "teacher" : "reject"}`;
 
-    const promises = []
+    const promises = [];
     promises.push(airtable.patch('Application Tracker', recordID, {
       "Notes": note,
       "Status": "rejected",
       "Date Responded": new Date().toISOString().slice(0, 10)
-    }))
+    }));
 
-    // send email
+    // Send email
     promises.push(sendEmail(email));
 
-    const channel = 'C02F9GD407J' /* #application-conspiracy */
+    const channel = 'C02F9GD407J'; /* #application-conspiracy */
     const timestamp = trackedApp.fields["Application Committee Timestamp"];
     if (timestamp) {
-      // applications created before #application-conspiracy were created don't have this field
-      promises.push(slackReact({channel, timestamp, name: 'no_entry'}))
-      promises.push(slackReact({channel, timestamp, name: 'white_check_mark', addOrRemove: 'remove'}))
-      promises.push(slackPostMessage({channel, timestamp, text: transcript('application-committee.rejected')}))
+      // Applications created before #application-conspiracy were created don't have this field
+      promises.push(slackReact({ channel, timestamp, name: 'no_entry' }));
+      promises.push(slackReact({ channel, timestamp, name: 'white_check_mark', addOrRemove: 'remove' }));
+      promises.push(slackPostMessage({ channel, timestamp, text: transcript('application-committee.rejected') }));
     }
 
-    await Promise.all(promises)
+    await Promise.all(promises);
 
-    res.send({ ok: true })
+    res.send({ ok: true });
 
   } catch (err) {
     console.error(err);
-    res.status(err.status || 500).send(err);
+    res.status(err.status || 500).send({ ok: false, err: err.message });
     return;
   }
 }

@@ -12,16 +12,19 @@ const getDino = () => {
     "https://cloud-d8b6vbwjs-hack-club-bot.vercel.app/8club_dinosaur.png",
   ];
 
+  // Ensure that the random number generation is secure and the array access is safe
   if (Math.random() > 0.05) {
     return regularDino;
   } else {
-    return specialDinos[Math.floor(Math.random()*specialDinos.length)];
+    return specialDinos[Math.floor(Math.random() * specialDinos.length)];
   }
 }
+
 const NotFound = () => (
   <>
     <h1>404, club not found</h1>
-    <img src={getDino()} />
+    {/* Ensure the image source is safe and trusted */}
+    <img src={getDino()} alt="Dinosaur" />
   </>
 )
 
